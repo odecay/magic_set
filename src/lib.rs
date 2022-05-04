@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::{prelude::*, TilePos};
-use bevy_inspector_egui::{Inspectable, RegisterInspectable};
+use bevy_inspector_egui::{egui::Event, Inspectable, RegisterInspectable};
 use rand::{
     distributions::{Distribution, Standard},
     thread_rng, Rng,
@@ -13,6 +13,7 @@ pub struct MagicSetPlugin;
 impl Plugin for MagicSetPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(TilemapPlugin)
+            .add_event::<MatchEvent>()
             .add_startup_system(startup)
             .add_system(spawn_cursor)
             .add_system(set_tiles)
@@ -23,7 +24,8 @@ impl Plugin for MagicSetPlugin {
             .register_inspectable::<Shape>()
             .add_system(set_mark)
             .add_system(check_match)
-            .add_system(remove_mark)
+            .add_system(remove_tiles.after(check_match))
+            .add_system(remove_mark.after(remove_tiles))
             .add_system(helpers::set_texture_filters_to_nearest);
 
         //.add_system(build_map);
@@ -31,6 +33,8 @@ impl Plugin for MagicSetPlugin {
 }
 
 struct Center(Vec2);
+
+struct MatchEvent(Entity);
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>, mut map_query: MapQuery) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
@@ -185,7 +189,11 @@ fn remove_mark(
     }
 }
 
-fn check_match(query: Query<(&Color, &Shape), With<Mark>>) {
+fn check_match(
+    query: Query<(&Color, &Shape), With<Mark>>,
+    entities: Query<Entity, (With<Mark>, With<Color>, With<Shape>)>,
+    mut match_event: EventWriter<MatchEvent>,
+) {
     let (mut colors, mut shapes): (Vec<_>, Vec<_>) = query.iter().unzip();
     let mut color_match = false;
     if colors.len() == 3 {
@@ -222,8 +230,18 @@ fn check_match(query: Query<(&Color, &Shape), With<Mark>>) {
         }
     }
     if shape_match == true && color_match == true {
-        println!("Match!!")
+        println!("Match!!");
+        for entity in entities.iter() {
+            match_event.send(MatchEvent(entity))
+        }
     }
+}
+
+fn remove_tiles(mut commands: Commands, mut match_event: EventReader<MatchEvent>) {
+    for entity in match_event.iter() {
+        commands.entity(entity.0).despawn_recursive();
+    }
+    //
 }
 
 fn spawn_cursor(
