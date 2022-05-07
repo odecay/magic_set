@@ -13,7 +13,7 @@ pub struct MagicSetPlugin;
 impl Plugin for MagicSetPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(TilemapPlugin)
-            .add_event::<MatchEvent>()
+            .add_event::<MatchedEvent>()
             .add_startup_system(startup)
             .add_system(spawn_cursor)
             .add_system(set_tiles)
@@ -34,7 +34,9 @@ impl Plugin for MagicSetPlugin {
 
 struct Center(Vec2);
 
-struct MatchEvent(Entity);
+struct MatchedEvent(Entity);
+
+struct SelectEvent(Entity);
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>, mut map_query: MapQuery) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
@@ -136,10 +138,13 @@ fn set_mark(
     mut commands: Commands,
     keys: Res<Input<KeyCode>>,
 ) {
+    //make parent entity instead of using mapquery
     if keys.just_pressed(KeyCode::Space) {
         for position in query.iter_mut() {
-            let tile_entity = map_query.get_tile_entity(*position, 0u16, 0u16).unwrap();
-            commands.entity(tile_entity).insert(Mark);
+            if let Ok(tile_entity) = map_query.get_tile_entity(*position, 0u16, 0u16) {
+                println!("{:?}", tile_entity);
+                commands.entity(tile_entity).insert(Mark);
+            }
         }
     }
 }
@@ -192,7 +197,7 @@ fn remove_mark(
 fn check_match(
     query: Query<(&Color, &Shape), With<Mark>>,
     entities: Query<Entity, (With<Mark>, With<Color>, With<Shape>)>,
-    mut match_event: EventWriter<MatchEvent>,
+    mut match_event: EventWriter<MatchedEvent>,
 ) {
     let (mut colors, mut shapes): (Vec<_>, Vec<_>) = query.iter().unzip();
     let mut color_match = false;
@@ -201,7 +206,7 @@ fn check_match(
         // println!("{:?}", colors);
         let mut unique_colors = colors.clone();
         unique_colors.dedup();
-        println!("{:?}", unique_colors);
+        // println!("{:?}", unique_colors);
         if colors.len() == unique_colors.len() {
             color_match = true;
             // println!("match of different colors!")
@@ -218,7 +223,7 @@ fn check_match(
         // println!("{:?}", shapes);
         let mut unique_shapes = shapes.clone();
         unique_shapes.dedup();
-        println!("{:?}", unique_shapes);
+        // println!("{:?}", unique_shapes);
         if shapes.len() == unique_shapes.len() {
             shape_match = true;
             // println!("match of different shapes!")
@@ -232,14 +237,23 @@ fn check_match(
     if shape_match == true && color_match == true {
         println!("Match!!");
         for entity in entities.iter() {
-            match_event.send(MatchEvent(entity))
+            match_event.send(MatchedEvent(entity))
         }
     }
 }
 
-fn remove_tiles(mut commands: Commands, mut match_event: EventReader<MatchEvent>) {
+fn remove_tiles(
+    mut commands: Commands,
+    mut match_event: EventReader<MatchedEvent>,
+    // query: Query<(&TilePos, &Color, &Shape)>, // query: Query<&Children, >
+) {
     for entity in match_event.iter() {
-        commands.entity(entity.0).despawn_recursive();
+        commands
+            .entity(entity.0)
+            .remove::<Shape>()
+            .remove::<Color>()
+            .remove::<Tile>();
+        // commands.entity(entity.0).despawn_recursive();
     }
     //
 }
