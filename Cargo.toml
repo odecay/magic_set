@@ -8,7 +8,10 @@ edition = "2021"
 [dependencies]
 rand = "0.8.5"
 bevy = "0.7"
-bevy_ecs_tilemap = {version = "0.6", features = ["atlas"]}
+bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap", branch = "rewrite", features = [
+  "atlas",
+] }
+
 # kayak_ui = ""
 # leafwing-input-manager = "0.2.0"
 bevy-inspector-egui = "0.10.0"
