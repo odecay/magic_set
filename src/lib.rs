@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
-// use bevy_ecs_tilemap::{prelude::*, TilePos};
 use bevy_ecs_tilemap::{
     map::{
         Tilemap2dGridSize, Tilemap2dSize, Tilemap2dTextureSize, Tilemap2dTileSize, TilemapId,
@@ -26,7 +25,6 @@ impl Plugin for MagicSetPlugin {
             .add_startup_system(startup)
             .add_system(spawn_cursor)
             .add_system(set_tiles)
-            .add_system(update_tiles.after(set_tiles))
             .add_system(move_cursor)
             .add_system(draw_mark)
             .register_inspectable::<Color>()
@@ -36,16 +34,11 @@ impl Plugin for MagicSetPlugin {
             .add_system(remove_tiles.after(check_match))
             .add_system(remove_mark.after(remove_tiles))
             .add_system(helpers::set_texture_filters_to_nearest);
-
-        //.add_system(build_map);
     }
 }
 
-// struct Center(Vec2);
-
 struct MatchedEvent(Entity);
 
-// fn startup(mut commands: Commands, asset_server: Res<AssetServer>, mut map_query: MapQuery) {
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
@@ -53,21 +46,6 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let tilemap_size = Tilemap2dSize { x: 20, y: 8 };
     let mut tile_storage = Tile2dStorage::empty(tilemap_size);
     let tilemap_entity = commands.spawn().id();
-
-    // let map_entity = commands.spawn().id();
-    // let mut map = Map::new(0u16, map_entity);
-    // let layer_settings = LayerSettings::new(
-    //     MapSize(10, 4),
-    //     ChunkSize(2, 2),
-    //     TileSize(32.0, 32.0),
-    //     TextureSize(96.0, 96.0),
-    // );
-    // let center = layer_settings.get_pixel_center();
-
-    //do i need to figure a diff way to get center??
-    //maybe figure out how to properly use child transform for placing cursor and mark??
-    // let center = bevy_ecs_tilemap::helpers::get_centered_transform_2d(size, tile_size, z_index)
-    // let center_res = Center(center);
 
     for x in 0..tilemap_size.x {
         for y in 0..tilemap_size.y {
@@ -106,53 +84,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             ),
             ..default()
         });
-
-    // let (mut layer_builder, layer_entity) =
-    //     LayerBuilder::<TileBundle>::new(&mut commands, layer_settings, 0u16, 0u16);
-
-    //layer_builder.set_all(TileBundle::default());
-
-    //current random board generation/initialization, adds random color and shape components
-    // layer_builder.for_each_tiles_mut(|tile_entity, tile_data| {
-    //     let random_color: Color = rand::random();
-    //     let random_shape: Shape = rand::random();
-
-    //     *tile_data = Some(TileBundle::new(
-    //         Tile {
-    //             texture_index: seed.gen_range(1..10),
-    //             ..Default::default()
-    //         },
-    //         TilePos::default(),
-    //     ));
-
-    //     if tile_entity.is_none() {
-    //         *tile_entity = Some(commands.spawn().id());
-    //     }
-    //     commands
-    //         .entity(tile_entity.unwrap())
-    //         .insert(random_color)
-    //         .insert(random_shape);
-    // });
-
-    // map_query.build_layer(&mut commands, layer_builder, texture_handle);
-
-    // commands.entity(layer_entity);
-
-    // map.add_layer(&mut commands, 0u16, layer_entity);
-
-    // commands
-    //     .entity(map_entity)
-    //     .insert(map)
-    //     .insert(Transform::from_xyz(-center.x, -center.y, 0.0))
-    //     // .insert(Transform::default())
-    //     .insert(GlobalTransform::default());
-    // commands.insert_resource(layer_settings);
-    // commands.insert_resource(center_res);
 }
-
-//ok we need a better way than random samples to build the board tiles (maybe)
-//waveform collapse?
-//psudeorandom algorithm of some kind
 
 fn set_tiles(mut query: Query<(&Color, &Shape, &mut TileTexture)>) {
     for (color, shape, mut tile_texture) in query.iter_mut() {
@@ -168,18 +100,6 @@ fn set_tiles(mut query: Query<(&Color, &Shape, &mut TileTexture)>) {
         };
         let index = c + s;
         tile_texture.0 = index;
-    }
-}
-
-fn update_tiles(
-    // mut commands: Commands,
-    // mut map_query: MapQuery,
-    mut query: Query<(&mut Color, &mut Shape, &TilePos2d)>,
-) {
-    for (mut color, mut shape, tile_pos) in query.iter_mut() {
-        // *color = rand::random();
-        // *shape = rand::random();
-        // map_query.notify_chunk_for_tile(*tile_pos, 0u16, 0u16)
     }
 }
 
@@ -299,36 +219,25 @@ fn check_match(
     }
 }
 
-fn remove_tiles(
-    mut commands: Commands,
-    mut match_event: EventReader<MatchedEvent>,
-    // query: Query<(&TilePos, &Color, &Shape)>, // query: Query<&Children, >
-) {
+fn remove_tiles(mut commands: Commands, mut match_event: EventReader<MatchedEvent>) {
     for entity in match_event.iter() {
         commands
             .entity(entity.0)
             .remove::<Shape>()
             .remove::<Color>()
             .insert(TileVisible(false));
-        // .remove::<Tile>();
-        //not sure what to replace Tile type with here??
-        // .remove::<TilemapId>();
-        // commands.entity(entity.0).despawn_recursive();
     }
-    //
 }
 
 fn spawn_cursor(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    // query: Query<(&Tilemap2dSize, &Tilemap2dTileSize), Added<Tile2dStorage>>,
     query: Query<Entity, (With<Tile2dStorage>, Added<Tile2dStorage>)>,
     tile_size: Res<Tilemap2dTileSize>,
     tilemap_size: Res<Tilemap2dSize>,
 ) {
     if let Ok(_) = query.get_single() {
         let handle: Handle<Image> = asset_server.load("cursor.png");
-        // let (tilemap_size, tile_size) = query.single();
         let tile_pos = TilePos2d { x: 0, y: 0 };
 
         commands
@@ -343,13 +252,6 @@ fn spawn_cursor(
                     &tile_size,
                     1.0,
                 ),
-
-                //might have to come back and add in the half tile offset
-                // transform: Transform::from_xyz(
-                //     -center.x + (tile_size.0 / 2.0),
-                //     -center.y + (tile_size.1 / 2.0),
-                //     1.0,
-                // ),
                 ..default()
             })
             .insert(Cursor)
@@ -359,13 +261,9 @@ fn spawn_cursor(
 
 fn move_cursor(
     mut query: Query<(&mut TilePos2d, &mut Transform), With<Cursor>>,
-    // layer_settings: Res<LayerSettings>,
     settings_query: Query<&Tilemap2dSize>,
     keys: Res<Input<KeyCode>>,
 ) {
-    // let map_size: Vec2 = layer_settings.map_size.into();
-    // let chunk_size: Vec2 = layer_settings.chunk_size.into();
-    // let bounds = map_size * chunk_size;
     let bounds = settings_query.single();
     for (mut tile_pos, mut transform) in query.iter_mut() {
         if keys.just_pressed(KeyCode::W) {
@@ -415,9 +313,6 @@ struct Mark;
 
 #[derive(Component)]
 struct Selection;
-
-#[derive(Component)]
-struct Card;
 
 #[derive(Inspectable, Component, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Color {
