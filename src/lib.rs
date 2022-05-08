@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::sprite::Anchor;
 // use bevy_ecs_tilemap::{prelude::*, TilePos};
 use bevy_ecs_tilemap::{
     map::{
@@ -203,32 +204,31 @@ fn draw_mark(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     query: Query<(&Mark, &TilePos2d), Added<Mark>>,
-    // settings_query: Query<(&Tilemap2dTileSize, &Tilemap2dSize)>,
     tile_size: Res<Tilemap2dTileSize>,
     tilemap_size: Res<Tilemap2dSize>,
-    //replace with resource/s tilemap2dtilesize and tilemap2dsize
 ) {
     let handle: Handle<Image> = asset_server.load("select.png");
-    // let (tile_size, tilemap_size) = settings_query.get_single().unwrap();
     for (_mark, tile_pos) in query.iter() {
         commands
             .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    anchor: Anchor::BottomLeft,
+                    ..default()
+                },
                 texture: handle.clone(),
-                // transform: Transform::from_xyz(
-                //     -center.0.x + (tile_size.0) * tile_pos.0 as f32 + (tile_size.0 / 2.0),
-                //     -center.0.y + (tile_size.1) * tile_pos.1 as f32 + (tile_size.1 / 2.0),
-                //     0.4,
-                // ),
-                //gotta recreate this math
                 transform: bevy_ecs_tilemap::helpers::get_centered_transform_2d(
                     &tilemap_size,
                     &tile_size,
                     1.0,
-                ),
+                )
+                .mul_transform(Transform::from_xyz(
+                    tile_pos.x as f32 * tile_size.x,
+                    tile_pos.y as f32 * tile_size.y,
+                    1.0,
+                )),
                 ..Default::default()
             })
             .insert(Selection);
-        // commands.entity(entity).push_children(&[child]);
     }
 }
 fn remove_mark(
@@ -309,9 +309,10 @@ fn remove_tiles(
             .entity(entity.0)
             .remove::<Shape>()
             .remove::<Color>()
-            // .remove::<Tile>();
-            //not sure what to replace Tile type with here??
-            .remove::<TilemapId>();
+            .insert(TileVisible(false));
+        // .remove::<Tile>();
+        //not sure what to replace Tile type with here??
+        // .remove::<TilemapId>();
         // commands.entity(entity.0).despawn_recursive();
     }
     //
@@ -321,32 +322,39 @@ fn spawn_cursor(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     // query: Query<(&Tilemap2dSize, &Tilemap2dTileSize), Added<Tile2dStorage>>,
+    query: Query<Entity, (With<Tile2dStorage>, Added<Tile2dStorage>)>,
     tile_size: Res<Tilemap2dTileSize>,
     tilemap_size: Res<Tilemap2dSize>,
 ) {
-    let handle: Handle<Image> = asset_server.load("cursor.png");
-    // let (tilemap_size, tile_size) = query.single();
-    let tile_pos = TilePos2d { x: 0, y: 0 };
+    if let Ok(_) = query.get_single() {
+        let handle: Handle<Image> = asset_server.load("cursor.png");
+        // let (tilemap_size, tile_size) = query.single();
+        let tile_pos = TilePos2d { x: 0, y: 0 };
 
-    commands
-        .spawn_bundle(SpriteBundle {
-            texture: handle.clone(),
-            transform: bevy_ecs_tilemap::helpers::get_centered_transform_2d(
-                &tilemap_size,
-                &tile_size,
-                1.0,
-            ),
+        commands
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    anchor: Anchor::BottomLeft,
+                    ..default()
+                },
+                texture: handle.clone(),
+                transform: bevy_ecs_tilemap::helpers::get_centered_transform_2d(
+                    &tilemap_size,
+                    &tile_size,
+                    1.0,
+                ),
 
-            //might have to come back and add in the half tile offset
-            // transform: Transform::from_xyz(
-            //     -center.x + (tile_size.0 / 2.0),
-            //     -center.y + (tile_size.1 / 2.0),
-            //     1.0,
-            // ),
-            ..default()
-        })
-        .insert(Cursor)
-        .insert(tile_pos);
+                //might have to come back and add in the half tile offset
+                // transform: Transform::from_xyz(
+                //     -center.x + (tile_size.0 / 2.0),
+                //     -center.y + (tile_size.1 / 2.0),
+                //     1.0,
+                // ),
+                ..default()
+            })
+            .insert(Cursor)
+            .insert(tile_pos);
+    }
 }
 
 fn move_cursor(
