@@ -1,5 +1,13 @@
 use bevy::prelude::*;
-use bevy_ecs_tilemap::{prelude::*, TilePos};
+// use bevy_ecs_tilemap::{prelude::*, TilePos};
+use bevy_ecs_tilemap::{
+    map::{
+        Tilemap2dGridSize, Tilemap2dSize, Tilemap2dTextureSize, Tilemap2dTileSize, TilemapId,
+        TilemapTexture,
+    },
+    tiles::{Tile2dStorage, TileBundle, TilePos2d, TileTexture, TileVisible},
+    Tilemap2dPlugin, TilemapBundle,
+};
 use bevy_inspector_egui::{egui::Event, Inspectable, RegisterInspectable};
 use rand::{
     distributions::{Distribution, Standard},
@@ -12,7 +20,7 @@ pub struct MagicSetPlugin;
 
 impl Plugin for MagicSetPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(TilemapPlugin)
+        app.add_plugin(Tilemap2dPlugin)
             .add_event::<MatchedEvent>()
             .add_startup_system(startup)
             .add_system(spawn_cursor)
@@ -32,79 +40,121 @@ impl Plugin for MagicSetPlugin {
     }
 }
 
-struct Center(Vec2);
+// struct Center(Vec2);
 
 struct MatchedEvent(Entity);
 
-struct SelectEvent(Entity);
-
-fn startup(mut commands: Commands, asset_server: Res<AssetServer>, mut map_query: MapQuery) {
+// fn startup(mut commands: Commands, asset_server: Res<AssetServer>, mut map_query: MapQuery) {
+fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     let texture_handle: Handle<Image> = asset_server.load("magic_chains.png");
+    let tilemap_size = Tilemap2dSize { x: 20, y: 8 };
+    let mut tile_storage = Tile2dStorage::empty(tilemap_size);
+    let tilemap_entity = commands.spawn().id();
 
-    let map_entity = commands.spawn().id();
-    let mut map = Map::new(0u16, map_entity);
-    let layer_settings = LayerSettings::new(
-        MapSize(10, 4),
-        ChunkSize(2, 2),
-        TileSize(32.0, 32.0),
-        TextureSize(96.0, 96.0),
-    );
-    let center = layer_settings.get_pixel_center();
-    let center_res = Center(center);
+    // let map_entity = commands.spawn().id();
+    // let mut map = Map::new(0u16, map_entity);
+    // let layer_settings = LayerSettings::new(
+    //     MapSize(10, 4),
+    //     ChunkSize(2, 2),
+    //     TileSize(32.0, 32.0),
+    //     TextureSize(96.0, 96.0),
+    // );
+    // let center = layer_settings.get_pixel_center();
 
-    let mut seed = thread_rng();
+    //do i need to figure a diff way to get center??
+    //maybe figure out how to properly use child transform for placing cursor and mark??
+    // let center = bevy_ecs_tilemap::helpers::get_centered_transform_2d(size, tile_size, z_index)
+    // let center_res = Center(center);
 
-    let (mut layer_builder, layer_entity) =
-        LayerBuilder::<TileBundle>::new(&mut commands, layer_settings, 0u16, 0u16);
+    for x in 0..tilemap_size.x {
+        for y in 0..tilemap_size.y {
+            let tile_pos = TilePos2d { x, y };
+            let tile_entity = commands
+                .spawn()
+                .insert_bundle(TileBundle {
+                    position: tile_pos,
+                    tilemap_id: TilemapId(tilemap_entity),
+                    ..default()
+                })
+                .insert(rand::random::<Shape>())
+                .insert(rand::random::<Color>())
+                .id();
+            tile_storage.set(&tile_pos, Some(tile_entity));
+        }
+    }
+
+    let tile_size = Tilemap2dTileSize { x: 32.0, y: 32.0 };
+    commands.insert_resource(tile_size);
+    commands.insert_resource(tilemap_size);
+
+    commands
+        .entity(tilemap_entity)
+        .insert_bundle(TilemapBundle {
+            grid_size: Tilemap2dGridSize { x: 32.0, y: 32.0 },
+            size: tilemap_size,
+            storage: tile_storage,
+            texture_size: Tilemap2dTextureSize { x: 96.0, y: 96.0 },
+            texture: TilemapTexture(texture_handle),
+            tile_size,
+            transform: bevy_ecs_tilemap::helpers::get_centered_transform_2d(
+                &tilemap_size,
+                &tile_size,
+                0.0,
+            ),
+            ..default()
+        });
+
+    // let (mut layer_builder, layer_entity) =
+    //     LayerBuilder::<TileBundle>::new(&mut commands, layer_settings, 0u16, 0u16);
 
     //layer_builder.set_all(TileBundle::default());
 
     //current random board generation/initialization, adds random color and shape components
-    layer_builder.for_each_tiles_mut(|tile_entity, tile_data| {
-        let random_color: Color = rand::random();
-        let random_shape: Shape = rand::random();
+    // layer_builder.for_each_tiles_mut(|tile_entity, tile_data| {
+    //     let random_color: Color = rand::random();
+    //     let random_shape: Shape = rand::random();
 
-        *tile_data = Some(TileBundle::new(
-            Tile {
-                texture_index: seed.gen_range(1..10),
-                ..Default::default()
-            },
-            TilePos::default(),
-        ));
+    //     *tile_data = Some(TileBundle::new(
+    //         Tile {
+    //             texture_index: seed.gen_range(1..10),
+    //             ..Default::default()
+    //         },
+    //         TilePos::default(),
+    //     ));
 
-        if tile_entity.is_none() {
-            *tile_entity = Some(commands.spawn().id());
-        }
-        commands
-            .entity(tile_entity.unwrap())
-            .insert(random_color)
-            .insert(random_shape);
-    });
+    //     if tile_entity.is_none() {
+    //         *tile_entity = Some(commands.spawn().id());
+    //     }
+    //     commands
+    //         .entity(tile_entity.unwrap())
+    //         .insert(random_color)
+    //         .insert(random_shape);
+    // });
 
-    map_query.build_layer(&mut commands, layer_builder, texture_handle);
+    // map_query.build_layer(&mut commands, layer_builder, texture_handle);
 
-    commands.entity(layer_entity);
+    // commands.entity(layer_entity);
 
-    map.add_layer(&mut commands, 0u16, layer_entity);
+    // map.add_layer(&mut commands, 0u16, layer_entity);
 
-    commands
-        .entity(map_entity)
-        .insert(map)
-        .insert(Transform::from_xyz(-center.x, -center.y, 0.0))
-        // .insert(Transform::default())
-        .insert(GlobalTransform::default());
-    commands.insert_resource(layer_settings);
-    commands.insert_resource(center_res);
+    // commands
+    //     .entity(map_entity)
+    //     .insert(map)
+    //     .insert(Transform::from_xyz(-center.x, -center.y, 0.0))
+    //     // .insert(Transform::default())
+    //     .insert(GlobalTransform::default());
+    // commands.insert_resource(layer_settings);
+    // commands.insert_resource(center_res);
 }
 
 //ok we need a better way than random samples to build the board tiles (maybe)
 //waveform collapse?
 //psudeorandom algorithm of some kind
 
-fn set_tiles(mut query: Query<(&Color, &Shape, &mut Tile)>) {
-    for (color, shape, mut tile) in query.iter_mut() {
+fn set_tiles(mut query: Query<(&Color, &Shape, &mut TileTexture)>) {
+    for (color, shape, mut tile_texture) in query.iter_mut() {
         let c = match color {
             Color::Blue => 0,
             Color::Red => 1,
@@ -116,32 +166,32 @@ fn set_tiles(mut query: Query<(&Color, &Shape, &mut Tile)>) {
             Shape::Triangle => 6,
         };
         let index = c + s;
-        tile.texture_index = index;
+        tile_texture.0 = index;
     }
 }
 
 fn update_tiles(
     // mut commands: Commands,
-    mut map_query: MapQuery,
-    mut query: Query<(&mut Color, &mut Shape, &TilePos)>,
+    // mut map_query: MapQuery,
+    mut query: Query<(&mut Color, &mut Shape, &TilePos2d)>,
 ) {
     for (mut color, mut shape, tile_pos) in query.iter_mut() {
         // *color = rand::random();
         // *shape = rand::random();
-        map_query.notify_chunk_for_tile(*tile_pos, 0u16, 0u16)
+        // map_query.notify_chunk_for_tile(*tile_pos, 0u16, 0u16)
     }
 }
 
 fn set_mark(
-    mut query: Query<&TilePos, With<Cursor>>,
-    mut map_query: MapQuery,
+    mut query: Query<&TilePos2d, With<Cursor>>,
+    mut tile_storage_query: Query<&Tile2dStorage>,
     mut commands: Commands,
     keys: Res<Input<KeyCode>>,
 ) {
-    //make parent entity instead of using mapquery
     if keys.just_pressed(KeyCode::Space) {
         for position in query.iter_mut() {
-            if let Ok(tile_entity) = map_query.get_tile_entity(*position, 0u16, 0u16) {
+            let tile_storage = tile_storage_query.single_mut();
+            if let Some(tile_entity) = tile_storage.get(position) {
                 println!("{:?}", tile_entity);
                 commands.entity(tile_entity).insert(Mark);
             }
@@ -152,21 +202,28 @@ fn set_mark(
 fn draw_mark(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    layer_settings: Res<LayerSettings>,
-    center: Res<Center>,
-    query: Query<(&Mark, &TilePos), Added<Mark>>,
+    query: Query<(&Mark, &TilePos2d), Added<Mark>>,
+    // settings_query: Query<(&Tilemap2dTileSize, &Tilemap2dSize)>,
+    tile_size: Res<Tilemap2dTileSize>,
+    tilemap_size: Res<Tilemap2dSize>,
+    //replace with resource/s tilemap2dtilesize and tilemap2dsize
 ) {
-    //maybe have this draw as a child of the tile?? how do i remove the visual when i clean up mark
     let handle: Handle<Image> = asset_server.load("select.png");
-    let tile_size = layer_settings.tile_size;
+    // let (tile_size, tilemap_size) = settings_query.get_single().unwrap();
     for (_mark, tile_pos) in query.iter() {
         commands
             .spawn_bundle(SpriteBundle {
                 texture: handle.clone(),
-                transform: Transform::from_xyz(
-                    -center.0.x + (tile_size.0) * tile_pos.0 as f32 + (tile_size.0 / 2.0),
-                    -center.0.y + (tile_size.1) * tile_pos.1 as f32 + (tile_size.1 / 2.0),
-                    0.4,
+                // transform: Transform::from_xyz(
+                //     -center.0.x + (tile_size.0) * tile_pos.0 as f32 + (tile_size.0 / 2.0),
+                //     -center.0.y + (tile_size.1) * tile_pos.1 as f32 + (tile_size.1 / 2.0),
+                //     0.4,
+                // ),
+                //gotta recreate this math
+                transform: bevy_ecs_tilemap::helpers::get_centered_transform_2d(
+                    &tilemap_size,
+                    &tile_size,
+                    1.0,
                 ),
                 ..Default::default()
             })
@@ -252,7 +309,9 @@ fn remove_tiles(
             .entity(entity.0)
             .remove::<Shape>()
             .remove::<Color>()
-            .remove::<Tile>();
+            // .remove::<Tile>();
+            //not sure what to replace Tile type with here??
+            .remove::<TilemapId>();
         // commands.entity(entity.0).despawn_recursive();
     }
     //
@@ -261,58 +320,79 @@ fn remove_tiles(
 fn spawn_cursor(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    query: Query<&Layer, Added<Layer>>,
+    // query: Query<(&Tilemap2dSize, &Tilemap2dTileSize), Added<Tile2dStorage>>,
+    tile_size: Res<Tilemap2dTileSize>,
+    tilemap_size: Res<Tilemap2dSize>,
 ) {
     let handle: Handle<Image> = asset_server.load("cursor.png");
-    for layer in query.get_single() {
-        let tile_pos = TilePos(0, 0);
-        let center = layer.settings.get_pixel_center();
-        let tile_size = layer.settings.tile_size;
-        commands
-            .spawn_bundle(SpriteBundle {
-                texture: handle.clone(),
-                transform: Transform::from_xyz(
-                    -center.x + (tile_size.0 / 2.0),
-                    -center.y + (tile_size.1 / 2.0),
-                    1.0,
-                ),
-                ..Default::default()
-            })
-            .insert(Cursor)
-            .insert(tile_pos);
-    }
+    // let (tilemap_size, tile_size) = query.single();
+    let tile_pos = TilePos2d { x: 0, y: 0 };
+
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: handle.clone(),
+            transform: bevy_ecs_tilemap::helpers::get_centered_transform_2d(
+                &tilemap_size,
+                &tile_size,
+                1.0,
+            ),
+
+            //might have to come back and add in the half tile offset
+            // transform: Transform::from_xyz(
+            //     -center.x + (tile_size.0 / 2.0),
+            //     -center.y + (tile_size.1 / 2.0),
+            //     1.0,
+            // ),
+            ..default()
+        })
+        .insert(Cursor)
+        .insert(tile_pos);
 }
 
 fn move_cursor(
-    mut query: Query<(&mut TilePos, &mut Transform), With<Cursor>>,
-    layer_settings: Res<LayerSettings>,
+    mut query: Query<(&mut TilePos2d, &mut Transform), With<Cursor>>,
+    // layer_settings: Res<LayerSettings>,
+    settings_query: Query<&Tilemap2dSize>,
     keys: Res<Input<KeyCode>>,
 ) {
-    let map_size: Vec2 = layer_settings.map_size.into();
-    let chunk_size: Vec2 = layer_settings.chunk_size.into();
-    let bounds = map_size * chunk_size;
+    // let map_size: Vec2 = layer_settings.map_size.into();
+    // let chunk_size: Vec2 = layer_settings.chunk_size.into();
+    // let bounds = map_size * chunk_size;
+    let bounds = settings_query.single();
     for (mut tile_pos, mut transform) in query.iter_mut() {
         if keys.just_pressed(KeyCode::W) {
-            if tile_pos.1 < bounds.y as u32 - 1 {
-                *tile_pos = TilePos(tile_pos.0, tile_pos.1 + 1);
+            if tile_pos.y < bounds.y as u32 - 1 {
+                *tile_pos = TilePos2d {
+                    x: tile_pos.x,
+                    y: tile_pos.y + 1,
+                };
                 transform.translation.y += 32.0;
             }
         }
         if keys.just_pressed(KeyCode::S) {
-            if tile_pos.1 > 0 {
-                *tile_pos = TilePos(tile_pos.0, tile_pos.1 - 1);
+            if tile_pos.y > 0 {
+                *tile_pos = TilePos2d {
+                    x: tile_pos.x,
+                    y: tile_pos.y - 1,
+                };
                 transform.translation.y -= 32.0;
             }
         }
         if keys.just_pressed(KeyCode::D) {
-            if tile_pos.0 < bounds.x as u32 - 1 {
-                *tile_pos = TilePos(tile_pos.0 + 1, tile_pos.1);
+            if tile_pos.x < bounds.x as u32 - 1 {
+                *tile_pos = TilePos2d {
+                    x: tile_pos.x + 1,
+                    y: tile_pos.y,
+                };
                 transform.translation.x += 32.0;
             }
         }
         if keys.just_pressed(KeyCode::A) {
-            if tile_pos.0 > 0 {
-                *tile_pos = TilePos(tile_pos.0 - 1, tile_pos.1);
+            if tile_pos.x > 0 {
+                *tile_pos = TilePos2d {
+                    x: tile_pos.x - 1,
+                    y: tile_pos.y,
+                };
                 transform.translation.x -= 32.0;
             }
         }
