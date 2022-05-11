@@ -5,10 +5,11 @@ use bevy_ecs_tilemap::{
         Tilemap2dGridSize, Tilemap2dSize, Tilemap2dTextureSize, Tilemap2dTileSize, TilemapId,
         TilemapTexture,
     },
-    tiles::{Tile2dStorage, TileBundle, TilePos2d, TileTexture, TileVisible},
+    tiles::{RemoveTile, Tile2dStorage, TileBundle, TilePos2d, TileTexture, TileVisible},
     Tilemap2dPlugin, TilemapBundle,
 };
 use bevy_inspector_egui::{egui::Event, Inspectable, RegisterInspectable};
+use iyes_loopless::prelude::*;
 use rand::{
     distributions::{Distribution, Standard},
     thread_rng, Rng,
@@ -22,11 +23,13 @@ impl Plugin for MagicSetPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Tilemap2dPlugin)
             .add_event::<MatchedEvent>()
+            .add_loopless_state(GameState::Game)
             .add_startup_system(startup)
             .add_system(spawn_cursor)
             .add_system(set_tiles)
             .add_system(move_cursor)
             .add_system(draw_mark)
+            .add_system(gravity.run_on_event::<MatchedEvent>())
             .register_inspectable::<Color>()
             .register_inspectable::<Shape>()
             .add_system(set_mark)
@@ -38,6 +41,13 @@ impl Plugin for MagicSetPlugin {
 }
 
 struct MatchedEvent(Entity);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum GameState {
+    Game,
+    Select,
+    Match,
+}
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
@@ -111,7 +121,7 @@ fn set_mark(
 ) {
     if keys.just_pressed(KeyCode::Space) {
         for position in query.iter_mut() {
-            let tile_storage = tile_storage_query.single_mut();
+            let tile_storage = tile_storage_query.single();
             if let Some(tile_entity) = tile_storage.get(position) {
                 println!("{:?}", tile_entity);
                 commands.entity(tile_entity).insert(Mark);
@@ -175,8 +185,9 @@ fn check_match(
     query: Query<(&Color, &Shape), With<Mark>>,
     entities: Query<Entity, (With<Mark>, With<Color>, With<Shape>)>,
     mut match_event: EventWriter<MatchedEvent>,
+    mut commands: Commands,
 ) {
-    let (mut colors, mut shapes): (Vec<_>, Vec<_>) = query.iter().unzip();
+    let (mut colors, mut shapes): (Vec<&Color>, Vec<&Shape>) = query.iter().unzip();
     let mut color_match = false;
     if colors.len() == 3 {
         colors.sort_unstable();
@@ -216,16 +227,46 @@ fn check_match(
         for entity in entities.iter() {
             match_event.send(MatchedEvent(entity))
         }
+        commands.insert_resource(NextState(GameState::Match));
     }
 }
 
-fn remove_tiles(mut commands: Commands, mut match_event: EventReader<MatchedEvent>) {
-    for entity in match_event.iter() {
+fn remove_tiles(mut commands: Commands, mut match_reader: EventReader<MatchedEvent>) {
+    for entity in match_reader.iter() {
         commands
             .entity(entity.0)
             .remove::<Shape>()
             .remove::<Color>()
             .insert(TileVisible(false));
+        // .insert(RemoveTile);
+    }
+}
+
+fn gravity(
+    mut commands: Commands,
+    // mut match_reader: EventReader<MatchedEvent>,
+    removed: Query<(Entity, &TilePos2d, &TileVisible), Changed<TileVisible>>,
+    storage: Query<&Tile2dStorage>,
+    size: Query<&Tilemap2dSize>,
+) {
+    let bound = size.single();
+    let tile_storage = storage.single();
+
+    for (tile, tile_pos, vis) in removed.iter() {
+        for position in tile_pos.y..bound.y {
+            let pos = TilePos2d {
+                x: tile_pos.x,
+                y: position,
+            };
+            if let Some(entity) = tile_storage.get(&pos) {
+                let moved_pos = TilePos2d {
+                    x: tile_pos.x,
+                    y: pos.y.saturating_sub(1u32),
+                };
+
+                commands.entity(entity).insert(moved_pos);
+            }
+        }
     }
 }
 
@@ -314,14 +355,14 @@ struct Mark;
 #[derive(Component)]
 struct Selection;
 
-#[derive(Inspectable, Component, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Inspectable, Component, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Color {
     Blue,
     Red,
     Yellow,
 }
 
-#[derive(Inspectable, Component, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Inspectable, Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Shape {
     Diamond,
     Circle,
