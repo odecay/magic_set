@@ -23,22 +23,31 @@ impl Plugin for MagicSetPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Tilemap2dPlugin)
             .add_event::<RemoveEvent>()
-            .add_event::<MoveEvent>()
-            .add_loopless_state(GameState::Game)
+            // .add_event::<MoveEvent>()
+            .add_loopless_state(GameState::Base)
             .add_startup_system(startup)
-            .add_system(spawn_cursor)
-            .add_system(set_tiles)
-            .add_system(move_cursor)
+            .add_system(set_tiles.run_in_state(GameState::Base))
+            .add_system(spawn_cursor.run_in_state(GameState::Base))
+            .add_system(move_cursor.run_in_state(GameState::Base))
             .add_system(draw_mark)
-            .add_system(gravity)
             // .add_system(move_tiles)
             .register_inspectable::<Color>()
             .register_inspectable::<Shape>()
-            .add_system(set_mark)
-            .add_system(unrender_tiles.after(check_match))
-            .add_system(remove_tiles.after(unrender_tiles))
-            .add_system(check_match)
-            .add_system(remove_mark.after(unrender_tiles))
+            .add_system(set_mark.run_in_state(GameState::Base))
+            .add_system(
+                check_match
+                    .run_if(select_condition)
+                    .run_in_state(GameState::Base),
+            )
+            .add_system(
+                remove_tiles.run_in_state(GameState::Match), // .after(check_match),
+            )
+            .add_system(gravity.run_in_state(GameState::Match).after(remove_tiles))
+            .add_system(
+                remove_mark
+                    .run_in_state(GameState::Match)
+                    .after(remove_tiles),
+            )
             // .add_system(remove_all.after(check_match))
             .add_system(helpers::set_texture_filters_to_nearest);
     }
@@ -51,7 +60,7 @@ struct MoveEvent(Entity);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum GameState {
-    Game,
+    Base,
     Select,
     Match,
 }
@@ -60,7 +69,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     let texture_handle: Handle<Image> = asset_server.load("magic_chains.png");
-    let tilemap_size = Tilemap2dSize { x: 4, y: 4 };
+    let tilemap_size = Tilemap2dSize { x: 4, y: 8 };
     let mut tile_storage = Tile2dStorage::empty(tilemap_size);
     let tilemap_entity = commands.spawn().id();
 
@@ -103,12 +112,6 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         });
 }
 
-fn remove_all(mut query: Query<(Entity, &Color, &Shape)>, mut commands: Commands) {
-    for (entity, _, _) in query.iter() {
-        commands.entity(entity).despawn_recursive();
-    }
-}
-
 fn set_tiles(mut query: Query<(&Color, &Shape, &mut TileTexture)>) {
     for (color, shape, mut tile_texture) in query.iter_mut() {
         let c = match color {
@@ -128,7 +131,7 @@ fn set_tiles(mut query: Query<(&Color, &Shape, &mut TileTexture)>) {
 
 fn set_mark(
     mut query: Query<&TilePos2d, With<Cursor>>,
-    mut tile_storage_query: Query<&Tile2dStorage>,
+    tile_storage_query: Query<&Tile2dStorage>,
     mut commands: Commands,
     keys: Res<Input<KeyCode>>,
 ) {
@@ -136,7 +139,7 @@ fn set_mark(
         for position in query.iter_mut() {
             let tile_storage = tile_storage_query.single();
             if let Some(tile_entity) = tile_storage.get(position) {
-                println!("{:?}", tile_entity);
+                // println!("{:?}", tile_entity);
                 commands.entity(tile_entity).insert(Mark);
             }
         }
@@ -146,12 +149,12 @@ fn set_mark(
 fn draw_mark(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    query: Query<(&Mark, &TilePos2d), Added<Mark>>,
+    query: Query<&TilePos2d, (With<Mark>, Added<Mark>)>,
     tile_size: Res<Tilemap2dTileSize>,
     tilemap_size: Res<Tilemap2dSize>,
 ) {
     let handle: Handle<Image> = asset_server.load("select.png");
-    for (_mark, tile_pos) in query.iter() {
+    for tile_pos in query.iter() {
         commands
             .spawn_bundle(SpriteBundle {
                 sprite: Sprite {
@@ -185,12 +188,19 @@ fn remove_mark(
             commands.entity(entity).remove::<Mark>();
         }
     }
-
     //probably move this into its own system
     if sprite_query.iter().count() == 3 {
         for entity in sprite_query.iter() {
             commands.entity(entity).despawn();
         }
+    }
+}
+
+fn select_condition(query: Query<Entity, With<Mark>>) -> bool {
+    if query.iter().count() >= 3 {
+        true
+    } else {
+        false
     }
 }
 
@@ -202,139 +212,129 @@ fn check_match(
 ) {
     let (mut colors, mut shapes): (Vec<&Color>, Vec<&Shape>) = query.iter().unzip();
     let mut color_match = false;
-    if colors.len() == 3 {
-        colors.sort_unstable();
-        // println!("{:?}", colors);
-        let mut unique_colors = colors.clone();
-        unique_colors.dedup();
-        // println!("{:?}", unique_colors);
-        if colors.len() == unique_colors.len() {
-            color_match = true;
-            // println!("match of different colors!")
-        } else if unique_colors.len() == 1 {
-            color_match = true;
-            // println!("match of same color!")
-        } else {
-            // println!("no match")
-        }
+    // if colors.len() == 3 {
+    colors.sort_unstable();
+    // println!("{:?}", colors);
+    let mut unique_colors = colors.clone();
+    unique_colors.dedup();
+    // println!("{:?}", unique_colors);
+    if colors.len() == unique_colors.len() {
+        color_match = true;
+        // println!("match of different colors!")
+    } else if unique_colors.len() == 1 {
+        color_match = true;
+        // println!("match of same color!")
+    } else {
+        // println!("no match")
     }
+    // }
     let mut shape_match = false;
-    if shapes.len() == 3 {
-        shapes.sort_unstable();
-        // println!("{:?}", shapes);
-        let mut unique_shapes = shapes.clone();
-        unique_shapes.dedup();
-        // println!("{:?}", unique_shapes);
-        if shapes.len() == unique_shapes.len() {
-            shape_match = true;
-            // println!("match of different shapes!")
-        } else if unique_shapes.len() == 1 {
-            shape_match = true;
-            // println!("match of same shape!")
-        } else {
-            // println!("no match")
-        }
+    // if shapes.len() == 3 {
+    shapes.sort_unstable();
+    // println!("{:?}", shapes);
+    let mut unique_shapes = shapes.clone();
+    unique_shapes.dedup();
+    // println!("{:?}", unique_shapes);
+    if shapes.len() == unique_shapes.len() {
+        shape_match = true;
+        // println!("match of different shapes!")
+    } else if unique_shapes.len() == 1 {
+        shape_match = true;
+        // println!("match of same shape!")
+    } else {
+        // println!("no match")
     }
+    // }
     if shape_match == true && color_match == true {
         println!("Match!!");
         for (entity, pos) in entities.iter() {
-            // commands.entity(entity).insert(TileVisible(false));
             match_event.send(RemoveEvent(entity, *pos))
         }
-        // commands.insert_resource(NextState(GameState::Match));
     }
+    commands.insert_resource(NextState(GameState::Match));
 }
 
-fn unrender_tiles(
+fn remove_tiles(
     mut commands: Commands,
     mut match_reader: EventReader<RemoveEvent>,
     mut storage: Query<&mut Tile2dStorage>,
 ) {
     let mut tile_storage = storage.single_mut();
     for evt in match_reader.iter() {
-        // commands.entity(evt.0).despawn_recursive();
-        commands
-            .entity(evt.0)
-            // .remove::<Shape>()
-            // .remove::<Color>()
-            .insert(TileVisible(false));
-        // .insert(RemoveTile);
+        commands.entity(evt.0).despawn_recursive();
         tile_storage.set(&evt.1, None)
     }
 }
 
-fn remove_tiles(mut commands: Commands, query: Query<(Entity, &TileVisible)>) {
-    for (entity, vis) in query.iter() {
-        if !vis.0 {
-            commands.entity(entity).despawn_recursive();
-        }
-    }
-}
+// fn random_remove(
+//     mut commands: Commands,
+//     query: Query<(Entity, &TilePos2d), (With<Color>, With<Shape>)>,
+//     mut storage_query: Query<&mut Tile2dStorage>,
+// ) {
+//     let mut storage = storage_query.single_mut();
+//     let mut random = thread_rng();
+//     let position = TilePos2d {
+//         x: random.gen_range(0..3),
+//         y: random.gen_range(0..3),
+//     };
+
+//     if let Some(tile_entity) = storage.get(&position) {
+//         commands.entity(tile_entity).despawn_recursive();
+//         // Don't forget to remove tiles from the tile storage!
+//         storage.set(&position, None);
+//     }
+// }
 
 fn gravity(
     mut commands: Commands,
-    // mut match_reader: EventReader<MatchedEvent>,
-    // mut move_writer: EventWriter<RemoveEvent>,
     mut query: Query<(Entity, &mut TilePos2d), With<TileVisible>>,
-    // removed: Query<(Entity, &TilePos2d, &TileVisible), Changed<TileVisible>>,
+    mut remove_reader: EventReader<RemoveEvent>,
     mut storage: Query<&mut Tile2dStorage>,
     size: Query<&Tilemap2dSize>,
 ) {
     let bound = size.single();
     let mut tile_storage = storage.single_mut();
 
-    for (tile, mut pos) in query.iter_mut() {
-        // println!("{:?}", tile);
-        if let Some(below_pos) = tile_storage.get_pos_below(&pos) {
-            // let tile_below = tile_storage.get(&below_pos);
-            if let None = tile_storage.get(&below_pos) {
-                let before = tile_storage.get(&pos);
+    //trying to figure out how to extract the tilepos into an arry from this without for loop?
+    let mut tiles: Vec<TilePos2d> = Vec::new();
+    for evt in remove_reader.iter() {
+        tiles.push(evt.1);
+    }
 
-                tile_storage.set(&below_pos, Some(tile));
-                tile_storage.set(&pos, None);
-                // move_writer.send(RemoveEvent(tile, *pos));
-                // let after = tile_storage.get(&pos);
-
-                // println!("before self{:?}", before);
-                // println!("after self{:?}", after);
-                pos.y = pos.y - 1u32;
+    for x in 0..bound.x {
+        for y in 0..bound.y {
+            let tile_pos = TilePos2d { x: x, y: y };
+            if let Some(below_pos) = tile_storage.get_pos_below(&tile_pos) {
+                if let None = tile_storage.get(&below_pos) {
+                    if let Some(tile_entity) = tile_storage.get(&tile_pos) {
+                        tile_storage.set(&below_pos, Some(tile_entity));
+                        tile_storage.set(&tile_pos, None);
+                        if let Ok((_e, mut entity_tile_pos)) = query.get_mut(tile_entity) {
+                            entity_tile_pos.y = entity_tile_pos.y - 1u32;
+                        }
+                    }
+                }
             }
         }
     }
-
-    // for (tile, tile_pos, vis) in removed.iter() {
-    //     if vis.0 == false {
-    //         for position in tile_pos.y..bound.y {
-    //             let pos = TilePos2d {
-    //                 x: tile_pos.x,
-    //                 y: position,
-    //             };
-    //             if let Some(entity) = tile_storage.get(&pos) {
-    //                 move_writer.send(MoveEvent(entity));
-    //                 // let moved_pos = TilePos2d {
-    //                 //     x: tile_pos.x,
-    //                 //     y: pos.y.saturating_sub(1u32),
-    //                 // };
-
-    //                 // commands.entity(entity).insert(moved_pos);
-    //             }
-    //             if let Some(tile_entity) = tile_storage.get(&pos) {
-    //                 commands.entity(tile_entity).insert(RemoveTile);
-    //                 // Don't forget to remove tiles from the tile storage!
-    //                 // tile_storage.set(&pos, None);
-    //             }
+    //this should loop thru all tilepos! and get them from storage and check if they are none and move tiles above none down
+    //instead of doing what it does rn
+    // for (tile, mut pos) in query.iter_mut() {
+    //     if let Some(below_pos) = tile_storage.get_pos_below(&pos) {
+    //         if let None = tile_storage.get(&below_pos) {
+    //             tile_storage.set(&below_pos, Some(tile));
+    //             tile_storage.set(&pos, None);
+    //             pos.y = pos.y - 1u32;
     //         }
-    //         //tilemap doesnt like actually removing them??
-    //         // commands.entity(tile).despawn_recursive();
     //     }
     // }
-
-    // commands.insert_resource(NextState(GameState::Game));
+    commands.insert_resource(NextState(GameState::Base));
 }
 
 trait TileReturn {
     fn get_pos_below(&self, tile_pos: &TilePos2d) -> Option<TilePos2d>;
 }
+// fn get_column(&self, tile_pos: &TilePos2d) -> Option<Vec<(Entity, TilePos2d)>>;
 
 impl TileReturn for Tile2dStorage {
     fn get_pos_below(&self, tile_pos: &TilePos2d) -> Option<TilePos2d> {
@@ -347,42 +347,42 @@ impl TileReturn for Tile2dStorage {
             None
         }
     }
-}
 
-fn move_tiles(
-    mut move_reader: EventReader<MoveEvent>,
-    mut query: Query<&TilePos2d, With<TilemapId>>,
-    mut storage_query: Query<&mut Tile2dStorage>,
-    mut commands: Commands,
-) {
-    // for mut tile_pos in query.iter_mut() {
-    //     tile_pos = &TilePos2d {
-    //         x: tile_pos.x,
-    //         y: tile_pos.y.saturating_sub(1u32),
-    //     }
+    // fn get_column(&self, tile_pos: &TilePos2d) -> Option<Vec<(Entity, TilePos2d)>> {
+    //     let column: Vec<(Entity, TilePos2d)> = Vec::new();
+    //     for y in 0..tile_pos.y {}
     // }
-    let mut storage = storage_query.single_mut();
-    let mut tiles: Vec<Entity> = Vec::new();
-
-    for evt in move_reader.iter() {
-        tiles.push(evt.0);
-    }
-    let mut unique_tiles: Vec<Entity> = Vec::new();
-    unique_tiles.clone_from(&tiles);
-    unique_tiles.sort_unstable();
-    unique_tiles.dedup();
-    for unique_tile in unique_tiles.iter() {
-        let count = tiles.iter().filter(|x| x == &unique_tile).count();
-        if let Ok(tile_pos) = query.get(*unique_tile) {
-            let moved_tile_pos = TilePos2d {
-                x: tile_pos.x,
-                y: tile_pos.y.saturating_sub(count as u32),
-            };
-            commands.entity(*unique_tile).insert(moved_tile_pos);
-            storage.set(&moved_tile_pos, Some(*unique_tile));
-        }
-    }
 }
+
+// fn move_tiles(
+//     mut move_reader: EventReader<RemoveEvent>,
+//     mut query: Query<&TilePos2d, With<TilemapId>>,
+//     mut storage_query: Query<&mut Tile2dStorage>,
+//     mut commands: Commands,
+// ) {
+//     let mut storage = storage_query.single_mut();
+//     let mut tiles: Vec<Entity> = Vec::new();
+
+//     for evt in move_reader.iter() {
+//         tiles.push(evt.0);
+//     }
+//     let mut unique_tiles: Vec<Entity> = Vec::new();
+//     unique_tiles.clone_from(&tiles);
+//     unique_tiles.sort_unstable();
+//     unique_tiles.dedup();
+//     for unique_tile in unique_tiles.iter() {
+//         let count = tiles.iter().filter(|x| x == &unique_tile).count();
+//         if let Ok(tile_pos) = query.get(*unique_tile) {
+//             let moved_tile_pos = TilePos2d {
+//                 x: tile_pos.x,
+//                 y: tile_pos.y.saturating_sub(count as u32),
+//             };
+//             commands.entity(*unique_tile).insert(moved_tile_pos);
+//             storage.set(&moved_tile_pos, Some(*unique_tile));
+//         }
+//     }
+//     commands.insert_resource(NextState(GameState::Base));
+// }
 
 fn spawn_cursor(
     mut commands: Commands,
