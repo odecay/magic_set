@@ -297,36 +297,6 @@ fn gravity(
     let bound = size.single();
     let mut tile_storage = storage.single_mut();
 
-    //trying to figure out how to extract the tilepos into an arry from this without for loop?
-    // let mut removed_tile_pos: Vec<TilePos2d> = Vec::new();
-    // for evt in remove_reader.iter() {
-    //     removed_tile_pos.push(evt.1);
-    // }
-    // println!("tiles {:?}", removed_tile_pos);
-    // for pos in removed_tile_pos.iter() {
-    //     //for each tile in column from tile to top
-    //     for y in pos.y..bound.y - 1 {
-    //         let tile_pos = TilePos2d { x: pos.x, y: y };
-    //         let above_pos = TilePos2d {
-    //             x: pos.x,
-    //             y: y + 1u32,
-    //         };
-    //         if let Some(tile_entity) = tile_storage.get(&above_pos) {
-    //             if let Ok((_e, mut entity_tile_pos)) = query.get_mut(tile_entity) {
-    //                 tile_storage.set(&above_pos, None);
-    //                 tile_storage.set(&tile_pos, Some(tile_entity));
-    //                 entity_tile_pos.y = entity_tile_pos.y - 1u32;
-    //             } else {
-    //                 println!("didnt find entity in query")
-    //             }
-    //         } else {
-    //             tile_storage.set(&tile_pos, None);
-    //             // tile_storage.set(&, None);
-    //             println!("no tile in storage not moving");
-    //         }
-    //     }
-    // }
-
     for x in 0..bound.x {
         for y in 0..bound.y {
             let tile_pos = TilePos2d { x: x, y: y };
@@ -343,24 +313,11 @@ fn gravity(
             }
         }
     }
-    // this should loop thru all tilepos! and get them from storage and check if they are none and move tiles above none down
-    // instead of doing what it does rn
-    // for (tile, mut pos) in query.iter_mut() {
-    //     if let Some(below_pos) = tile_storage.get_pos_below(&pos) {
-    //         if let None = tile_storage.get(&below_pos) {
-    //             tile_storage.set(&below_pos, Some(tile));
-    //             tile_storage.set(&pos, None);
-    //             pos.y = pos.y - 1u32;
-    //         }
-    //     }
-    // }
-    // commands.insert_resource(NextState(GameState::Base));
 }
 
 trait TileReturn {
     fn get_pos_below(&self, tile_pos: &TilePos2d) -> Option<TilePos2d>;
 }
-// fn get_column(&self, tile_pos: &TilePos2d) -> Option<Vec<(Entity, TilePos2d)>>;
 
 impl TileReturn for Tile2dStorage {
     fn get_pos_below(&self, tile_pos: &TilePos2d) -> Option<TilePos2d> {
@@ -373,11 +330,6 @@ impl TileReturn for Tile2dStorage {
             None
         }
     }
-
-    // fn get_column(&self, tile_pos: &TilePos2d) -> Option<Vec<(Entity, TilePos2d)>> {
-    //     let column: Vec<(Entity, TilePos2d)> = Vec::new();
-    //     for y in 0..tile_pos.y {}
-    // }
 }
 
 // fn move_tiles(
@@ -442,10 +394,13 @@ fn spawn_cursor(
 
 fn move_cursor(
     mut query: Query<(&mut TilePos2d, &mut Transform), With<Cursor>>,
-    settings_query: Query<&Tilemap2dSize>,
+    bound_query: Query<&Tilemap2dSize>,
+    size_query: Query<&Tilemap2dTileSize>,
+    tile_storage_query: Query<&Tile2dStorage>,
     keys: Res<Input<KeyCode>>,
 ) {
-    let bounds = settings_query.single();
+    let bounds = bound_query.single();
+    let tile_size = size_query.single();
     for (mut tile_pos, mut transform) in query.iter_mut() {
         if keys.just_pressed(KeyCode::W) {
             if tile_pos.y < bounds.y as u32 - 1 {
@@ -453,7 +408,7 @@ fn move_cursor(
                     x: tile_pos.x,
                     y: tile_pos.y + 1,
                 };
-                transform.translation.y += 32.0;
+                transform.translation.y += tile_size.y;
             }
         }
         if keys.just_pressed(KeyCode::S) {
@@ -462,7 +417,7 @@ fn move_cursor(
                     x: tile_pos.x,
                     y: tile_pos.y - 1,
                 };
-                transform.translation.y -= 32.0;
+                transform.translation.y -= tile_size.y;
             }
         }
         if keys.just_pressed(KeyCode::D) {
@@ -471,7 +426,7 @@ fn move_cursor(
                     x: tile_pos.x + 1,
                     y: tile_pos.y,
                 };
-                transform.translation.x += 32.0;
+                transform.translation.x += tile_size.x;
             }
         }
         if keys.just_pressed(KeyCode::A) {
@@ -480,8 +435,12 @@ fn move_cursor(
                     x: tile_pos.x - 1,
                     y: tile_pos.y,
                 };
-                transform.translation.x -= 32.0;
+                transform.translation.x -= tile_size.x;
             }
+        }
+        //debug for tile_storage
+        if keys.just_pressed(KeyCode::P) {
+            println!("tile_storage {:?}", tile_storage_query.single());
         }
     }
 }
