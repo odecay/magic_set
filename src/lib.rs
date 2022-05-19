@@ -42,7 +42,8 @@ impl Plugin for MagicSetPlugin {
             .add_system(
                 remove_tiles.run_in_state(GameState::Match), // .after(check_match),
             )
-            .add_system(gravity.run_in_state(GameState::Match).after(remove_tiles))
+            // .add_system(gravity.run_in_state(GameState::Match).after(remove_tiles))
+            .add_system(gravity)
             .add_system(
                 remove_mark
                     .run_in_state(GameState::Match)
@@ -194,6 +195,7 @@ fn remove_mark(
             commands.entity(entity).despawn();
         }
     }
+    commands.insert_resource(NextState(GameState::Base));
 }
 
 fn select_condition(query: Query<Entity, With<Mark>>) -> bool {
@@ -296,10 +298,34 @@ fn gravity(
     let mut tile_storage = storage.single_mut();
 
     //trying to figure out how to extract the tilepos into an arry from this without for loop?
-    let mut tiles: Vec<TilePos2d> = Vec::new();
-    for evt in remove_reader.iter() {
-        tiles.push(evt.1);
-    }
+    // let mut removed_tile_pos: Vec<TilePos2d> = Vec::new();
+    // for evt in remove_reader.iter() {
+    //     removed_tile_pos.push(evt.1);
+    // }
+    // println!("tiles {:?}", removed_tile_pos);
+    // for pos in removed_tile_pos.iter() {
+    //     //for each tile in column from tile to top
+    //     for y in pos.y..bound.y - 1 {
+    //         let tile_pos = TilePos2d { x: pos.x, y: y };
+    //         let above_pos = TilePos2d {
+    //             x: pos.x,
+    //             y: y + 1u32,
+    //         };
+    //         if let Some(tile_entity) = tile_storage.get(&above_pos) {
+    //             if let Ok((_e, mut entity_tile_pos)) = query.get_mut(tile_entity) {
+    //                 tile_storage.set(&above_pos, None);
+    //                 tile_storage.set(&tile_pos, Some(tile_entity));
+    //                 entity_tile_pos.y = entity_tile_pos.y - 1u32;
+    //             } else {
+    //                 println!("didnt find entity in query")
+    //             }
+    //         } else {
+    //             tile_storage.set(&tile_pos, None);
+    //             // tile_storage.set(&, None);
+    //             println!("no tile in storage not moving");
+    //         }
+    //     }
+    // }
 
     for x in 0..bound.x {
         for y in 0..bound.y {
@@ -317,8 +343,8 @@ fn gravity(
             }
         }
     }
-    //this should loop thru all tilepos! and get them from storage and check if they are none and move tiles above none down
-    //instead of doing what it does rn
+    // this should loop thru all tilepos! and get them from storage and check if they are none and move tiles above none down
+    // instead of doing what it does rn
     // for (tile, mut pos) in query.iter_mut() {
     //     if let Some(below_pos) = tile_storage.get_pos_below(&pos) {
     //         if let None = tile_storage.get(&below_pos) {
@@ -328,7 +354,7 @@ fn gravity(
     //         }
     //     }
     // }
-    commands.insert_resource(NextState(GameState::Base));
+    // commands.insert_resource(NextState(GameState::Base));
 }
 
 trait TileReturn {
