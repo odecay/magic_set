@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::schedule::ReportExecutionOrderAmbiguities, prelude::*};
 use bevy_inspector_egui::WorldInspectorPlugin;
 //use bevy::window::WindowMode;
 use magic_set::MagicSetPlugin;
@@ -18,5 +18,6 @@ fn main() {
         .add_plugin(WorldInspectorPlugin::new())
         // Add plugins here
         .add_plugin(MagicSetPlugin)
+        .insert_resource(ReportExecutionOrderAmbiguities)
         .run();
 }
