@@ -5,14 +5,15 @@ use bevy_ecs_tilemap::{
         Tilemap2dGridSize, Tilemap2dSize, Tilemap2dTextureSize, Tilemap2dTileSize, TilemapId,
         TilemapTexture,
     },
-    tiles::{RemoveTile, Tile2dStorage, TileBundle, TilePos2d, TileTexture, TileVisible},
+    tiles::{Tile2dStorage, TileBundle, TilePos2d, TileTexture, TileVisible},
     Tilemap2dPlugin, TilemapBundle,
 };
+#[cfg(feature = "debug")]
 use bevy_inspector_egui::{egui::Event, Inspectable, RegisterInspectable};
 use iyes_loopless::prelude::*;
 use rand::{
     distributions::{Distribution, Standard},
-    thread_rng, Rng,
+    Rng,
 };
 
 mod helpers;
@@ -25,8 +26,6 @@ impl Plugin for MagicSetPlugin {
             .add_event::<RemoveEvent>()
             // .add_event::<MoveEvent>()
             .add_loopless_state(GameState::Base)
-            .register_inspectable::<Color>()
-            .register_inspectable::<Shape>()
             .add_startup_system(startup)
             .add_system(set_tiles.run_in_state(GameState::Base))
             .add_system(spawn_cursor.run_in_state(GameState::Base))
@@ -50,6 +49,12 @@ impl Plugin for MagicSetPlugin {
             )
             // .add_system(remove_all.after(check_match))
             .add_system(helpers::set_texture_filters_to_nearest);
+
+        #[cfg(feature = "debug")]
+        {
+            app.register_inspectable::<Color>()
+                .register_inspectable::<Shape>();
+        }
     }
 }
 
@@ -459,14 +464,15 @@ struct Mark;
 #[derive(Component)]
 struct Selection;
 
-#[derive(Inspectable, Component, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "debug", derive(bevy_inspector_egui::Inspectable))]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Color {
     Blue,
     Red,
     Yellow,
 }
-
-#[derive(Inspectable, Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "debug", derive(bevy_inspector_egui::Inspectable))]
+#[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Shape {
     Diamond,
     Circle,
