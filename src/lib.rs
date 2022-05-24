@@ -24,20 +24,22 @@ impl Plugin for MagicSetPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Tilemap2dPlugin)
             .add_event::<RemoveEvent>()
-            // .add_event::<MoveEvent>()
+            .add_event::<MoveEvent>()
             .add_loopless_state(GameState::Base)
             .add_startup_system(startup)
             .add_system(set_tiles.run_in_state(GameState::Base))
             .add_system(spawn_cursor.run_in_state(GameState::Base))
-            .add_system(move_cursor.run_in_state(GameState::Base))
+            .add_system(move_cursor)
+            // .add_system(move_cursor.run_in_state(GameState::Base))
             .add_system(draw_mark)
             // .add_system(gravity)
             .add_system(move_tiles)
-            .add_system(set_mark.run_in_state(GameState::Base))
+            .add_system(enter_select.run_in_state(GameState::Base))
+            .add_system(set_mark.run_in_state(GameState::Select))
             .add_system(
                 check_match
                     .run_if(select_condition)
-                    .run_in_state(GameState::Base),
+                    .run_in_state(GameState::Select),
             )
             .add_system(
                 remove_tiles.run_in_state(GameState::Match), // .after(check_match),
@@ -60,7 +62,7 @@ impl Plugin for MagicSetPlugin {
 
 struct RemoveEvent(Entity, TilePos2d);
 
-// struct MoveEvent(Entity);
+struct MoveEvent(TilePos2d);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum GameState {
@@ -134,17 +136,38 @@ fn set_tiles(mut query: Query<(&Color, &Shape, &mut TileTexture)>) {
 }
 
 fn set_mark(
-    mut query: Query<&TilePos2d, With<Cursor>>,
+    mut move_reader: EventReader<MoveEvent>,
+    // query: Query<&TilePos2d, With<Cursor>>,
+    tile_storage_query: Query<&Tile2dStorage>,
+    marked_tile_query: Query<&TilePos2d, With<Mark>>,
+    mut commands: Commands,
+    // keys: Res<Input<KeyCode>>,
+) {
+    let tile_storage = tile_storage_query.single();
+    for evt in move_reader.iter() {
+        if let Some(tile_entity) = tile_storage.get(&evt.0) {
+            if !marked_tile_query.contains(tile_entity) {
+                commands.entity(tile_entity).insert(Mark);
+            }
+        }
+    }
+}
+
+fn enter_select(
+    query: Query<&TilePos2d, With<Cursor>>,
     tile_storage_query: Query<&Tile2dStorage>,
     mut commands: Commands,
     keys: Res<Input<KeyCode>>,
+    mut move_writer: EventWriter<MoveEvent>,
 ) {
     if keys.just_pressed(KeyCode::Space) {
-        for position in query.iter_mut() {
-            let tile_storage = tile_storage_query.single();
+        let tile_storage = tile_storage_query.single();
+        for position in query.iter() {
             if let Some(tile_entity) = tile_storage.get(position) {
                 // println!("{:?}", tile_entity);
                 commands.entity(tile_entity).insert(Mark);
+                move_writer.send(MoveEvent(*position));
+                commands.insert_resource(NextState(GameState::Select));
             }
         }
     }
@@ -407,6 +430,7 @@ fn move_cursor(
     bound_query: Query<&Tilemap2dSize>,
     size_query: Query<&Tilemap2dTileSize>,
     tile_storage_query: Query<&Tile2dStorage>,
+    mut move_writer: EventWriter<MoveEvent>,
     keys: Res<Input<KeyCode>>,
 ) {
     let bounds = bound_query.single();
@@ -419,6 +443,7 @@ fn move_cursor(
                     y: tile_pos.y + 1,
                 };
                 transform.translation.y += tile_size.y;
+                move_writer.send(MoveEvent(*tile_pos));
             }
         }
         if keys.just_pressed(KeyCode::S) {
@@ -428,6 +453,7 @@ fn move_cursor(
                     y: tile_pos.y - 1,
                 };
                 transform.translation.y -= tile_size.y;
+                move_writer.send(MoveEvent(*tile_pos));
             }
         }
         if keys.just_pressed(KeyCode::D) {
@@ -437,6 +463,7 @@ fn move_cursor(
                     y: tile_pos.y,
                 };
                 transform.translation.x += tile_size.x;
+                move_writer.send(MoveEvent(*tile_pos));
             }
         }
         if keys.just_pressed(KeyCode::A) {
@@ -446,6 +473,7 @@ fn move_cursor(
                     y: tile_pos.y,
                 };
                 transform.translation.x -= tile_size.x;
+                move_writer.send(MoveEvent(*tile_pos));
             }
         }
         //debug for tile_storage
