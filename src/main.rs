@@ -9,7 +9,8 @@ fn main() {
     let mut app = App::new();
     // Configure the game window
     app.insert_resource(WindowDescriptor {
-        width: 960.0,
+        // width: 960.0,
+        width: 900.0,
         height: 720.0,
         title: "magic_set".to_string(),
         ..default()

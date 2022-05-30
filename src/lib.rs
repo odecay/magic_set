@@ -74,7 +74,8 @@ enum GameState {
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
-    let texture_handle: Handle<Image> = asset_server.load("magic_chains.png");
+    // let texture_handle: Handle<Image> = asset_server.load("magic_chains.png");
+    let texture_handle: Handle<Image> = asset_server.load("card_shapes.png");
     let tilemap_size = Tilemap2dSize { x: 12, y: 8 };
     let mut tile_storage = Tile2dStorage::empty(tilemap_size);
     let tilemap_entity = commands.spawn().id();
@@ -96,17 +97,18 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         }
     }
 
-    let tile_size = Tilemap2dTileSize { x: 32.0, y: 32.0 };
+    let tile_size = Tilemap2dTileSize { x: 48.0, y: 56.0 };
+
     commands.insert_resource(tile_size);
     commands.insert_resource(tilemap_size);
 
     commands
         .entity(tilemap_entity)
         .insert_bundle(TilemapBundle {
-            grid_size: Tilemap2dGridSize { x: 32.0, y: 32.0 },
+            grid_size: Tilemap2dGridSize { x: 48.0, y: 56.0 },
             size: tilemap_size,
             storage: tile_storage,
-            texture_size: Tilemap2dTextureSize { x: 96.0, y: 96.0 },
+            texture_size: Tilemap2dTextureSize { x: 144.0, y: 168.0 },
             texture: TilemapTexture(texture_handle),
             tile_size,
             transform: bevy_ecs_tilemap::helpers::get_centered_transform_2d(
@@ -180,7 +182,7 @@ fn draw_mark(
     tile_size: Res<Tilemap2dTileSize>,
     tilemap_size: Res<Tilemap2dSize>,
 ) {
-    let handle: Handle<Image> = asset_server.load("select.png");
+    let handle: Handle<Image> = asset_server.load("select_w.png");
     for tile_pos in query.iter() {
         commands
             .spawn_bundle(SpriteBundle {
@@ -403,7 +405,7 @@ fn spawn_cursor(
     tilemap_size: Res<Tilemap2dSize>,
 ) {
     if let Ok(_) = query.get_single() {
-        let handle: Handle<Image> = asset_server.load("cursor.png");
+        let handle: Handle<Image> = asset_server.load("cursor_w.png");
         let tile_pos = TilePos2d { x: 0, y: 0 };
 
         commands
@@ -444,6 +446,13 @@ fn move_cursor(
                 };
                 transform.translation.y += tile_size.y;
                 move_writer.send(MoveEvent(*tile_pos));
+            } else {
+                *tile_pos = TilePos2d {
+                    x: tile_pos.x,
+                    y: 0,
+                };
+                transform.translation.y -= (bounds.y - 1) as f32 * tile_size.y;
+                move_writer.send(MoveEvent(*tile_pos));
             }
         }
         if keys.just_pressed(KeyCode::S) {
@@ -453,6 +462,13 @@ fn move_cursor(
                     y: tile_pos.y - 1,
                 };
                 transform.translation.y -= tile_size.y;
+                move_writer.send(MoveEvent(*tile_pos));
+            } else {
+                *tile_pos = TilePos2d {
+                    x: tile_pos.x,
+                    y: bounds.y - 1,
+                };
+                transform.translation.y += (bounds.y - 1) as f32 * tile_size.y;
                 move_writer.send(MoveEvent(*tile_pos));
             }
         }
@@ -464,6 +480,13 @@ fn move_cursor(
                 };
                 transform.translation.x += tile_size.x;
                 move_writer.send(MoveEvent(*tile_pos));
+            } else {
+                *tile_pos = TilePos2d {
+                    x: 0,
+                    y: tile_pos.y,
+                };
+                transform.translation.x -= (bounds.x - 1) as f32 * tile_size.x;
+                move_writer.send(MoveEvent(*tile_pos));
             }
         }
         if keys.just_pressed(KeyCode::A) {
@@ -473,6 +496,13 @@ fn move_cursor(
                     y: tile_pos.y,
                 };
                 transform.translation.x -= tile_size.x;
+                move_writer.send(MoveEvent(*tile_pos));
+            } else {
+                *tile_pos = TilePos2d {
+                    x: bounds.x - 1,
+                    y: tile_pos.y,
+                };
+                transform.translation.x += (bounds.x - 1) as f32 * tile_size.x;
                 move_writer.send(MoveEvent(*tile_pos));
             }
         }
