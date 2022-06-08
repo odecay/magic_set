@@ -44,11 +44,12 @@ impl Plugin for MagicSetPlugin {
             .add_system(
                 remove_tiles.run_in_state(GameState::Match), // .after(check_match),
             )
-            .add_system(
-                remove_mark
-                    .run_in_state(GameState::Match)
-                    .after(remove_tiles),
-            )
+            // .add_system(
+            //     remove_mark
+            //         .run_in_state(GameState::Match)
+            //         .after(remove_tiles),
+            // )
+            .add_exit_system(GameState::Match, remove_mark)
             // .add_system(remove_all.after(check_match))
             .add_system(helpers::set_texture_filters_to_nearest);
 
@@ -217,13 +218,13 @@ fn remove_mark(
             commands.entity(entity).remove::<Mark>();
         }
     }
-    //probably move this into its own system
+    //consider moving this into its own system
     if sprite_query.iter().count() == 3 {
         for entity in sprite_query.iter() {
             commands.entity(entity).despawn();
         }
     }
-    commands.insert_resource(NextState(GameState::Base));
+    // commands.insert_resource(NextState(GameState::Base));
 }
 
 fn select_condition(query: Query<Entity, With<Mark>>) -> bool {
@@ -290,6 +291,7 @@ fn remove_tiles(
         commands.entity(evt.0).despawn_recursive();
         tile_storage.set(&evt.1, None)
     }
+    commands.insert_resource(NextState(GameState::Base));
 }
 
 // fn random_remove(
