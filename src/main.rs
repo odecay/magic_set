@@ -1,6 +1,6 @@
 #[cfg(feature = "debug")]
 use bevy::ecs::schedule::ReportExecutionOrderAmbiguities;
-use bevy::prelude::*;
+use bevy::{prelude::*, render::texture::ImageSettings};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::WorldInspectorPlugin;
 use magic_set::MagicSetPlugin;
@@ -14,7 +14,7 @@ fn main() {
         height: 720.0,
         title: "magic_set".to_string(),
         ..default()
-    })
+    }).insert_resource(ImageSettings::default_nearest())
     .add_plugins(DefaultPlugins);
     #[cfg(feature = "debug")]
     app.add_plugin(WorldInspectorPlugin::new())

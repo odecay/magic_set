@@ -49,9 +49,9 @@ impl Plugin for MagicSetPlugin {
             //         .run_in_state(GameState::Match)
             //         .after(remove_tiles),
             // )
-            .add_exit_system(GameState::Match, remove_mark)
+            .add_exit_system(GameState::Match, remove_mark);
             // .add_system(remove_all.after(check_match))
-            .add_system(helpers::set_texture_filters_to_nearest);
+            // .add_system(helpers::set_texture_filters_to_nearest);
 
         #[cfg(feature = "debug")]
         {
@@ -73,10 +73,10 @@ enum GameState {
 }
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands.spawn_bundle(Camera2dBundle::default());
 
     // let texture_handle: Handle<Image> = asset_server.load("magic_chains.png");
-    let texture_handle: Handle<Image> = asset_server.load("magic_chains_solid.png");
+    let texture_handle: Handle<Image> = asset_server.load("card_shapes.png");
     let tilemap_size = Tilemap2dSize { x: 12, y: 6 };
     let mut tile_storage = Tile2dStorage::empty(tilemap_size);
     let tilemap_entity = commands.spawn().id();
@@ -98,7 +98,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         }
     }
 
-    let tile_size = Tilemap2dTileSize { x: 32.0, y: 32.0 };
+    let tile_size = Tilemap2dTileSize { x: 48.0, y: 56.0 };
 
     commands.insert_resource(tile_size);
     commands.insert_resource(tilemap_size);
@@ -106,10 +106,10 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .entity(tilemap_entity)
         .insert_bundle(TilemapBundle {
-            grid_size: Tilemap2dGridSize { x: 32.0, y: 32.0 },
+            grid_size: Tilemap2dGridSize { x: 48.0, y: 56.0 },
             size: tilemap_size,
             storage: tile_storage,
-            texture_size: Tilemap2dTextureSize { x: 96.0, y: 96.0 },
+            texture_size: Tilemap2dTextureSize { x: 144.0, y: 168.0 },
             texture: TilemapTexture(texture_handle),
             tile_size,
             transform: bevy_ecs_tilemap::helpers::get_centered_transform_2d(
@@ -183,7 +183,7 @@ fn draw_mark(
     tile_size: Res<Tilemap2dTileSize>,
     tilemap_size: Res<Tilemap2dSize>,
 ) {
-    let handle: Handle<Image> = asset_server.load("select_small.png");
+    let handle: Handle<Image> = asset_server.load("select_w.png");
     for tile_pos in query.iter() {
         commands
             .spawn_bundle(SpriteBundle {
@@ -395,7 +395,7 @@ fn spawn_cursor(
     tilemap_size: Res<Tilemap2dSize>,
 ) {
     if query.get_single().is_ok() {
-        let handle: Handle<Image> = asset_server.load("cursor_small.png");
+        let handle: Handle<Image> = asset_server.load("cursor_w.png");
         let tile_pos = TilePos2d { x: 0, y: 0 };
 
         commands
