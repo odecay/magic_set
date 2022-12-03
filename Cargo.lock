@@ -217,9 +217,9 @@ dependencies = [
 
 [[package]]
 name = "bevy-inspector-egui"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8db3d1c5c1598c41e632bda7564624c41dcdc13051c796abf43412cc55bb1cc"
+checksum = "f0c53ed1cad011e33ea145d2c1f649a966e7457453f3768ddff39bc5064bd525"
 dependencies = [
  "bevy",
  "bevy-inspector-egui-derive",
@@ -407,7 +407,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs_tilemap"
 version = "0.7.0"
-source = "git+https://github.com/StarArawn/bevy_ecs_tilemap?branch=rewrite#dd8c7c6af86e6fc592e6e3757e647d929e31a2ce"
+source = "git+https://github.com/StarArawn/bevy_ecs_tilemap#de8d005331dde7d9ebb8c4fe1b36769b84e44be5"
 dependencies = [
  "bevy",
  "log",

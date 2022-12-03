@@ -14,7 +14,8 @@ fn main() {
         height: 720.0,
         title: "magic_set".to_string(),
         ..default()
-    }).insert_resource(ImageSettings::default_nearest())
+    })
+    .insert_resource(ImageSettings::default_nearest())
     .add_plugins(DefaultPlugins);
     #[cfg(feature = "debug")]
     app.add_plugin(WorldInspectorPlugin::new())
