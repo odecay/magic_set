@@ -4,7 +4,7 @@ use bevy::sprite::Anchor;
 use bevy_ecs_tilemap::{
     map::{TilemapGridSize, TilemapId, TilemapSize, TilemapTexture, TilemapTileSize},
     prelude::get_tilemap_center_transform,
-    tiles::{TileBundle, TilePos, TileStorage, TileTexture, TileVisible},
+    tiles::{TileBundle, TilePos, TileStorage, TileVisible},
     TilemapBundle, TilemapPlugin,
 };
 #[cfg(feature = "debug")]
