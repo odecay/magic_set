@@ -1,10 +1,9 @@
 use bevy::prelude::*;
-use bevy::sprite::Anchor;
 
 use bevy_ecs_tilemap::{
     map::{TilemapGridSize, TilemapId, TilemapSize, TilemapTexture, TilemapTileSize},
-    prelude::get_tilemap_center_transform,
-    tiles::{TileBundle, TilePos, TileStorage, TileVisible},
+    prelude::{get_tilemap_center_transform, TilemapType},
+    tiles::{TileBundle, TilePos, TileStorage, TileTextureIndex, TileVisible},
     TilemapBundle, TilemapPlugin,
 };
 #[cfg(feature = "debug")]
@@ -72,21 +71,32 @@ enum GameState {
     Match,
 }
 
+struct TilemapMetadata {
+    size: TilemapSize,
+    tile_size: TilemapTileSize,
+    grid_size: TilemapGridSize,
+}
+
+const TILEMAP_METADATA: TilemapMetadata = TilemapMetadata {
+    size: TilemapSize { x: 12, y: 6 },
+    tile_size: TilemapTileSize { x: 48.0, y: 56.0 },
+    grid_size: TilemapGridSize { x: 48.0, y: 56.0 },
+};
+
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn_bundle(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle::default());
 
     // let texture_handle: Handle<Image> = asset_server.load("magic_chains.png");
     let texture_handle: Handle<Image> = asset_server.load("card_shapes.png");
     let tilemap_size = TilemapSize { x: 12, y: 6 };
     let mut tile_storage = TileStorage::empty(tilemap_size);
-    let tilemap_entity = commands.spawn().id();
+    let tilemap_entity = commands.spawn_empty().id();
 
     for x in 0..tilemap_size.x {
         for y in 0..tilemap_size.y {
             let tile_pos = TilePos { x, y };
             let tile_entity = commands
-                .spawn()
-                .insert_bundle(TileBundle {
+                .spawn(TileBundle {
                     position: tile_pos,
                     tilemap_id: TilemapId(tilemap_entity),
                     ..default()
@@ -99,27 +109,25 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 
     let tile_size = TilemapTileSize { x: 48.0, y: 56.0 };
-    let grid_size = TilemapGridSize { x: 48.0, y: 56.0 };
+    let grid_size = tile_size.into();
+    let map_type = TilemapType::default();
 
-    commands.insert_resource(grid_size);
-    commands.insert_resource(tilemap_size);
+    // commands.insert_resource(grid_size);
+    // commands.insert_resource(tilemap_size);
 
-    commands
-        .entity(tilemap_entity)
-        .insert_bundle(TilemapBundle {
-            // grid_size: TilemapGridSize { x: 48.0, y: 56.0 },
-            // grid_size: grid_size,
-            size: tilemap_size,
-            storage: tile_storage,
-            // texture_size: Tilemap2dTextureSize { x: 144.0, y: 168.0 },
-            texture: TilemapTexture(texture_handle),
-            tile_size,
-            transform: get_tilemap_center_transform(&tilemap_size, &grid_size, 0.0),
-            ..default()
-        });
+    commands.entity(tilemap_entity).insert(TilemapBundle {
+        grid_size,
+        map_type,
+        size: tilemap_size,
+        storage: tile_storage,
+        texture: TilemapTexture::Single(texture_handle),
+        tile_size,
+        transform: get_tilemap_center_transform(&tilemap_size, &grid_size, &map_type, 0.0),
+        ..default()
+    });
 }
 
-fn set_tiles(mut query: Query<(&Color, &Shape, &mut TileTexture)>) {
+fn set_tiles(mut query: Query<(&Color, &Shape, &mut TileTextureIndex)>) {
     for (color, shape, mut tile_texture) in query.iter_mut() {
         let c = match color {
             Color::Blue => 0,
@@ -179,24 +187,30 @@ fn draw_mark(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     query: Query<&TilePos, (With<Mark>, Added<Mark>)>,
-    grid_size: Res<TilemapGridSize>,
-    tilemap_size: Res<TilemapSize>,
+    // grid_size: Res<TilemapGridSize>,
+    // tilemap_size: Res<TilemapSize>,
 ) {
     let handle: Handle<Image> = asset_server.load("select_w.png");
     for tile_pos in query.iter() {
         commands
-            .spawn_bundle(SpriteBundle {
+            .spawn(SpriteBundle {
                 sprite: Sprite {
-                    anchor: Anchor::BottomLeft,
+                    // anchor: Anchor::BottomLeft,
                     ..default()
                 },
                 texture: handle.clone(),
-                transform: get_tilemap_center_transform(&tilemap_size, &grid_size, 1.0)
-                    .mul_transform(Transform::from_xyz(
-                        tile_pos.x as f32 * grid_size.x,
-                        tile_pos.y as f32 * grid_size.y,
-                        1.0,
-                    )),
+                // transform: get_tilemap_center_transform(&tilemap_size, &grid_size, 1.0)
+                transform: get_tilemap_center_transform(
+                    &TILEMAP_METADATA.size,
+                    &TILEMAP_METADATA.grid_size,
+                    &TilemapType::default(),
+                    1.0,
+                )
+                .mul_transform(Transform::from_xyz(
+                    tile_pos.x as f32 * TILEMAP_METADATA.grid_size.x,
+                    tile_pos.y as f32 * TILEMAP_METADATA.grid_size.y,
+                    1.0,
+                )),
                 ..Default::default()
             })
             .insert(Selection);
@@ -364,8 +378,7 @@ fn move_tiles(
                         if let Ok((_entity_tile_pos, color, shape)) = tile_query.get(tile_entity) {
                             //copy over components, spawn a new tile
                             let moved_tile = commands
-                                .spawn()
-                                .insert_bundle(TileBundle {
+                                .spawn(TileBundle {
                                     position: below_pos,
                                     tilemap_id: TilemapId(tilemap_entity),
                                     ..default()
@@ -387,21 +400,26 @@ fn spawn_cursor(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     query: Query<Entity, (With<TileStorage>, Added<TileStorage>)>,
-    grid_size: Res<TilemapGridSize>,
-    tilemap_size: Res<TilemapSize>,
+    // grid_size: Res<TilemapGridSize>,
+    // tilemap_size: Res<TilemapSize>,
 ) {
     if query.get_single().is_ok() {
         let handle: Handle<Image> = asset_server.load("cursor_w.png");
         let tile_pos = TilePos { x: 0, y: 0 };
 
         commands
-            .spawn_bundle(SpriteBundle {
+            .spawn(SpriteBundle {
                 sprite: Sprite {
-                    anchor: Anchor::BottomLeft,
+                    // anchor: Anchor::BottomLeft,
                     ..default()
                 },
                 texture: handle.clone(),
-                transform: get_tilemap_center_transform(&tilemap_size, &grid_size, 1.0),
+                transform: get_tilemap_center_transform(
+                    &TILEMAP_METADATA.size,
+                    &TILEMAP_METADATA.grid_size,
+                    &TilemapType::default(),
+                    1.0,
+                ),
                 ..default()
             })
             .insert(Cursor)
