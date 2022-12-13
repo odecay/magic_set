@@ -73,13 +73,13 @@ enum GameState {
 
 struct TilemapMetadata {
     size: TilemapSize,
-    tile_size: TilemapTileSize,
+    // tile_size: TilemapTileSize,
     grid_size: TilemapGridSize,
 }
 
 const TILEMAP_METADATA: TilemapMetadata = TilemapMetadata {
     size: TilemapSize { x: 12, y: 6 },
-    tile_size: TilemapTileSize { x: 48.0, y: 56.0 },
+    // tile_size: TilemapTileSize { x: 48.0, y: 56.0 },
     grid_size: TilemapGridSize { x: 48.0, y: 56.0 },
 };
 
