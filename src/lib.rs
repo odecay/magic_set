@@ -71,22 +71,25 @@ enum GameState {
     Match,
 }
 
+#[derive(Component)]
+enum State {
+    Idle,
+    Select,
+}
+
 struct TilemapMetadata {
     size: TilemapSize,
-    // tile_size: TilemapTileSize,
     grid_size: TilemapGridSize,
 }
 
 const TILEMAP_METADATA: TilemapMetadata = TilemapMetadata {
     size: TilemapSize { x: 12, y: 6 },
-    // tile_size: TilemapTileSize { x: 48.0, y: 56.0 },
     grid_size: TilemapGridSize { x: 48.0, y: 56.0 },
 };
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(Camera2dBundle::default());
 
-    // let texture_handle: Handle<Image> = asset_server.load("magic_chains.png");
     let texture_handle: Handle<Image> = asset_server.load("card_shapes.png");
     let tilemap_size = TilemapSize { x: 12, y: 6 };
     let mut tile_storage = TileStorage::empty(tilemap_size);
@@ -111,9 +114,6 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let tile_size = TilemapTileSize { x: 48.0, y: 56.0 };
     let grid_size = tile_size.into();
     let map_type = TilemapType::default();
-
-    // commands.insert_resource(grid_size);
-    // commands.insert_resource(tilemap_size);
 
     commands.entity(tilemap_entity).insert(TilemapBundle {
         grid_size,
