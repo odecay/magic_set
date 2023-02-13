@@ -10,12 +10,11 @@ fn main() {
     app.add_plugins(
         DefaultPlugins
             .set(WindowPlugin {
-                window: WindowDescriptor {
+                primary_window: Some(Window {
                     title: "magic_set".to_string(),
-                    width: 900.0,
-                    height: 720.0,
+                    resolution: (900.0, 720.0).into(),
                     ..default()
-                },
+                }),
                 ..default()
             })
             .set(ImagePlugin::default_nearest()),

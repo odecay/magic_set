@@ -7,16 +7,19 @@ edition = "2021"
 
 [dependencies]
 rand = "0.8"
-bevy = "0.9"
-iyes_loopless = "0.9"
-bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap", features = [ "atlas" ]}
+strum = "0.24"
+bevy = { git = "https://github.com/bevyengine/bevy"}
+# iyes_loopless = "0.9"
+# remove tilmap dep
+# bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap", features = [ "atlas" ]}
+
 
 # leafwing-input-manager = "0.5.0"
-bevy-inspector-egui = { version = "0.14", optional = true }
+# bevy-inspector-egui = { version = "0.14", optional = true }
 
 [features]
 defualt = []
-debug = ["bevy-inspector-egui"]
+# debug = ["bevy-inspector-egui"]
 
 [profile.dev]
 opt-level = 1

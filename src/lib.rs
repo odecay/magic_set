@@ -1,21 +1,22 @@
 use bevy::prelude::*;
 
-use bevy_ecs_tilemap::{
-    map::{TilemapGridSize, TilemapId, TilemapSize, TilemapTexture, TilemapTileSize},
-    prelude::{get_tilemap_center_transform, TilemapType},
-    tiles::{TileBundle, TilePos, TileStorage, TileTextureIndex, TileVisible},
-    TilemapBundle, TilemapPlugin,
-};
+// use bevy_ecs_tilemap::{
+//     map::{TilemapGridSize, TilemapId, TilemapSize, TilemapTexture, TilemapTileSize},
+//     prelude::{get_tilemap_center_transform, TilemapType},
+//     tiles::{TileBundle, TilePos, TileStorage, TileTextureIndex, TileVisible},
+//     TilemapBundle, TilemapPlugin,
+// };
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{egui::Event, Inspectable, RegisterInspectable};
-use iyes_loopless::prelude::*;
 
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
 
-mod helpers;
+use tiles::{Color, Shape, TileBundle};
+// mod helpers;
+mod tiles;
 
 pub struct MagicSetPlugin;
 
@@ -521,40 +522,3 @@ struct Mark;
 
 #[derive(Component)]
 struct Selection;
-
-#[cfg_attr(feature = "debug", derive(bevy_inspector_egui::Inspectable))]
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum Color {
-    Blue,
-    Red,
-    Yellow,
-}
-#[cfg_attr(feature = "debug", derive(bevy_inspector_egui::Inspectable))]
-#[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Shape {
-    Diamond,
-    Circle,
-    Triangle,
-    //Star,
-    //Cross,
-}
-
-impl Distribution<Color> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Color {
-        match rng.gen_range(0..=2) {
-            0 => Color::Blue,
-            1 => Color::Red,
-            _ => Color::Yellow,
-        }
-    }
-}
-
-impl Distribution<Shape> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Shape {
-        match rng.gen_range(0..=2) {
-            0 => Shape::Diamond,
-            1 => Shape::Circle,
-            _ => Shape::Triangle,
-        }
-    }
-}
