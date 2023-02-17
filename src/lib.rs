@@ -6,16 +6,13 @@ use bevy_ecs_tilemap::{
     tiles::{TileBundle, TilePos, TileStorage, TileTextureIndex, TileVisible},
     TilemapBundle, TilemapPlugin,
 };
-#[cfg(feature = "debug")]
-use bevy_inspector_egui::{egui::Event, Inspectable, RegisterInspectable};
-use iyes_loopless::prelude::*;
+// #[cfg(feature = "debug")]
+// use bevy_inspector_egui::{egui::Event, Inspectable, RegisterInspectable};
 
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
-
-mod helpers;
 
 pub struct MagicSetPlugin;
 
@@ -24,39 +21,40 @@ impl Plugin for MagicSetPlugin {
         app.add_plugin(TilemapPlugin)
             .add_event::<RemoveEvent>()
             .add_event::<MoveEvent>()
-            .add_loopless_state(GameState::Base)
+            // .add_loopless_state(GameState::Base)
+            .add_state::<GameState>()
             .add_startup_system(startup)
-            .add_system(set_tiles.run_in_state(GameState::Base))
-            .add_system(spawn_cursor.run_in_state(GameState::Base))
+            .add_system(set_tiles.in_set(OnUpdate(GameState::Base)))
+            .add_system(spawn_cursor.in_set(OnUpdate(GameState::Base)))
             .add_system(move_cursor)
             // .add_system(move_cursor.run_in_state(GameState::Base))
             .add_system(draw_mark)
             // .add_system(gravity)
             .add_system(move_tiles)
-            .add_system(enter_select.run_in_state(GameState::Base))
-            .add_system(set_mark.run_in_state(GameState::Select))
+            .add_system(enter_select.in_set(OnUpdate(GameState::Base)))
+            .add_system(set_mark.in_set(OnUpdate(GameState::Select)))
             .add_system(
                 check_match
                     .run_if(select_condition)
-                    .run_in_state(GameState::Select),
+                    .in_set(OnUpdate(GameState::Select)),
             )
             .add_system(
-                remove_tiles.run_in_state(GameState::Match), // .after(check_match),
+                remove_tiles.in_set(OnUpdate(GameState::Match)), // .after(check_match),
             )
             // .add_system(
             //     remove_mark
             //         .run_in_state(GameState::Match)
             //         .after(remove_tiles),
             // )
-            .add_exit_system(GameState::Match, remove_mark);
+            .add_system_to_schedule(OnExit(GameState::Match), remove_mark);
         // .add_system(remove_all.after(check_match))
         // .add_system(helpers::set_texture_filters_to_nearest);
 
-        #[cfg(feature = "debug")]
-        {
-            app.register_inspectable::<Color>()
-                .register_inspectable::<Shape>();
-        }
+        // #[cfg(feature = "debug")]
+        // {
+        //     app.register_inspectable::<Color>()
+        //         .register_inspectable::<Shape>();
+        // }
     }
 }
 
@@ -64,8 +62,10 @@ struct RemoveEvent(Entity, TilePos);
 
 struct MoveEvent(TilePos);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, States)]
+//probably change this to playerstate
 enum GameState {
+    #[default]
     Base,
     Select,
     Match,
@@ -168,6 +168,7 @@ fn enter_select(
     tile_storage_query: Query<&TileStorage>,
     mut commands: Commands,
     keys: Res<Input<KeyCode>>,
+    mut next_state: ResMut<NextState<GameState>>,
     mut move_writer: EventWriter<MoveEvent>,
 ) {
     if keys.just_pressed(KeyCode::Space) {
@@ -177,7 +178,8 @@ fn enter_select(
                 // println!("{:?}", tile_entity);
                 commands.entity(tile_entity).insert(Mark);
                 move_writer.send(MoveEvent(*position));
-                commands.insert_resource(NextState(GameState::Select));
+                next_state.set(GameState::Select)
+                // commands.insert_resource(NextState(GameState::Select));
             }
         }
     }
@@ -245,6 +247,7 @@ fn check_match(
     entities: Query<(Entity, &TilePos), (With<Mark>, With<Color>, With<Shape>)>,
     mut match_event: EventWriter<RemoveEvent>,
     mut commands: Commands,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     let (mut colors, mut shapes): (Vec<&Color>, Vec<&Shape>) = query.iter().unzip();
     let mut color_match = false;
@@ -275,20 +278,23 @@ fn check_match(
             match_event.send(RemoveEvent(entity, *pos))
         }
     }
-    commands.insert_resource(NextState(GameState::Match));
+    // commands.insert_resource(NextState(GameState::Match));
+    next_state.set(GameState::Match);
 }
 
 fn remove_tiles(
     mut commands: Commands,
     mut match_reader: EventReader<RemoveEvent>,
     mut storage: Query<&mut TileStorage>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     let mut tile_storage = storage.single_mut();
     for evt in match_reader.iter() {
         commands.entity(evt.0).despawn_recursive();
         tile_storage.remove(&evt.1)
     }
-    commands.insert_resource(NextState(GameState::Base));
+    // commands.insert_resource(NextState(GameState::Base));
+    next_state.set(GameState::Base);
 }
 
 // fn random_remove(
